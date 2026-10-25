@@ -1,0 +1,4 @@
+{"signals":[
+{"path":"Vehicle.Chassis.Axle.Row1.Wheel.Speed","description":"Rotational speed of the wheel","datatype":"float","unit":"km/h","access":"read"},
+{"path":"Vehicle.Body.IsLocked","description":"Whether the vehicle is currently locked","datatype":"boolean","access":"read"}
+]}
