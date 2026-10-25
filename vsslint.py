@@ -4,14 +4,21 @@ import json
 import re
 from pathlib import Path
 PATH=re.compile(r"^[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)+$")
-TYPES={"boolean","uint8","uint16","uint32","int8","int16","int32","float","string"}
+# VSS primitive types include 64-bit integers and double precision floating
+# point values.  Omitting them rejects otherwise valid catalogs before they
+# can be consumed by downstream tooling.
+TYPES={"boolean","uint8","uint16","uint32","uint64","int8","int16","int32","int64","float","double","string"}
 def lint(model):
     errors=[]; seen=set()
     for i,s in enumerate(model.get("signals",[])):
         prefix="signals[%d]"%i; path=s.get("path"); name=path.rsplit(".",1)[-1] if isinstance(path,str) and "." in path else ""
         if not isinstance(path,str) or not PATH.match(path): errors.append(prefix+": invalid logical path")
-        if path in seen: errors.append(prefix+": duplicate path "+str(path))
-        seen.add(path)
+        # JSON paths can be arrays/objects as well as strings.  Invalid
+        # values are already reported above; do not use unhashable values as
+        # keys in ``seen`` or malformed input would crash the linter.
+        if isinstance(path,str):
+            if path in seen: errors.append(prefix+": duplicate path "+str(path))
+            seen.add(path)
         if not isinstance(s.get("description"),str) or len(s["description"].strip())<8: errors.append(prefix+": description is too short")
         if s.get("datatype") not in TYPES: errors.append(prefix+": unsupported datatype")
         if s.get("datatype") not in ("boolean","string") and not isinstance(s.get("unit"),str): errors.append(prefix+": numeric signals require unit")
