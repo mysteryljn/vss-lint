@@ -9,9 +9,19 @@ PATH=re.compile(r"^[A-Z][A-Za-z0-9]*(?:\.[A-Z][A-Za-z0-9]*)+$")
 # can be consumed by downstream tooling.
 TYPES={"boolean","uint8","uint16","uint32","uint64","int8","int16","int32","int64","float","double","string"}
 def lint(model):
-    errors=[]; seen=set()
-    for i,s in enumerate(model.get("signals",[])):
-        prefix="signals[%d]"%i; path=s.get("path"); name=path.rsplit(".",1)[-1] if isinstance(path,str) and "." in path else ""
+    errors=[]
+    if not isinstance(model,dict):
+        return ["model must be a JSON object"]
+    signals=model.get("signals",[])
+    if not isinstance(signals,list):
+        return ["signals must be an array"]
+    seen=set()
+    for i,s in enumerate(signals):
+        prefix="signals[%d]"%i
+        if not isinstance(s,dict):
+            errors.append(prefix+": signal must be an object")
+            continue
+        path=s.get("path"); name=path.rsplit(".",1)[-1] if isinstance(path,str) and "." in path else ""
         if not isinstance(path,str) or not PATH.match(path): errors.append(prefix+": invalid logical path")
         # JSON paths can be arrays/objects as well as strings.  Invalid
         # values are already reported above; do not use unhashable values as
@@ -21,7 +31,8 @@ def lint(model):
             seen.add(path)
         if not isinstance(s.get("description"),str) or len(s["description"].strip())<8: errors.append(prefix+": description is too short")
         if s.get("datatype") not in TYPES: errors.append(prefix+": unsupported datatype")
-        if s.get("datatype") not in ("boolean","string") and not isinstance(s.get("unit"),str): errors.append(prefix+": numeric signals require unit")
+        unit=s.get("unit")
+        if s.get("datatype") not in ("boolean","string") and (not isinstance(unit,str) or not unit.strip()): errors.append(prefix+": numeric signals require unit")
         if s.get("access") not in ("read","write","readWrite"): errors.append(prefix+": access must be read, write, or readWrite")
         if name.startswith("Is") and s.get("datatype")!="boolean": errors.append(prefix+": Is* signals should be boolean")
     return errors
