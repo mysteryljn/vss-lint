@@ -23,6 +23,11 @@ def lint(model):
     signals=model.get("signals",[])
     if not isinstance(signals,list):
         return ["signals must be an array"]
+    if not signals:
+        # An empty or truncated catalog cannot provide any signal contract;
+        # accepting it as valid would let a CI job report success after an
+        # export failure removed every entry.
+        return ["signals must not be empty"]
     seen=set()
     for i,s in enumerate(signals):
         prefix="signals[%d]"%i
@@ -52,7 +57,10 @@ def lint(model):
 def main(argv=None):
     p=argparse.ArgumentParser(description="Lint a VSS-like signal catalog"); p.add_argument("model",type=Path); a=p.parse_args(argv)
     try: errors=lint(json.loads(a.model.read_text(encoding="utf-8")))
-    except (OSError,json.JSONDecodeError) as e: print("error: "+str(e)); return 2
+    # The catalog is an external artifact.  Invalid UTF-8 must be reported as
+    # a normal input error instead of leaking a decoder traceback from
+    # Path.read_text() and aborting the lint job.
+    except (OSError,json.JSONDecodeError,UnicodeError) as e: print("error: "+str(e)); return 2
     if errors: print("\n".join("ERROR "+e for e in errors)); return 1
     print("OK: VSS signal catalog passed"); return 0
 if __name__=="__main__": raise SystemExit(main())

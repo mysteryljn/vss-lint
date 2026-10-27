@@ -1,5 +1,7 @@
+import tempfile
 import unittest
-from vsslint import lint
+from pathlib import Path
+from vsslint import lint, main
 class VssTests(unittest.TestCase):
     def test_valid(self):
         self.assertEqual(lint({"signals":[{"path":"Vehicle.Body.IsLocked","description":"Whether it is locked","datatype":"boolean","access":"read"}]}),[])
@@ -55,4 +57,15 @@ class VssTests(unittest.TestCase):
 
     def test_non_object_model_is_reported_without_crashing(self):
         self.assertEqual(lint([{"path": "Vehicle.Body.IsLocked"}]), ["model must be a JSON object"])
+
+    def test_empty_catalog_is_rejected(self):
+        self.assertEqual(lint({}), ["signals must not be empty"])
+        self.assertEqual(lint({"signals": []}), ["signals must not be empty"])
+
+    def test_cli_reports_non_utf8_catalog_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "signals.json"
+            path.write_bytes(b'{"signals": [\xff\xfe]}')
+            self.assertEqual(main([str(path)]), 2)
+
 if __name__=="__main__": unittest.main()
