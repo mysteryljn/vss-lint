@@ -17,6 +17,20 @@ class VssTests(unittest.TestCase):
         ]
         self.assertEqual(lint({"signals": signals}), [])
 
+    def test_vss_primitive_arrays_are_supported(self):
+        signals = [
+            {"path": "Vehicle.Diagnostics.DTCList", "description": "Diagnostic trouble codes", "datatype": "uint32[]", "unit": "code", "access": "read"},
+            {"path": "Vehicle.Cabin.Labels", "description": "Labels associated with cabin", "datatype": "string[]", "access": "read"},
+        ]
+        self.assertEqual(lint({"signals": signals}), [])
+
+    def test_invalid_array_datatypes_are_rejected(self):
+        errors = lint({"signals": [
+            {"path": "Vehicle.Diagnostics.Bad", "description": "Invalid nested array", "datatype": "uint32[][]", "access": "read"},
+            {"path": "Vehicle.Diagnostics.Unknown", "description": "Unknown array element", "datatype": "bytes[]", "access": "read"},
+        ]})
+        self.assertEqual(sum("unsupported datatype" in e for e in errors), 2)
+
     def test_numeric_signals_reject_empty_or_whitespace_units(self):
         errors = lint({"signals": [
             {"path": "Vehicle.Power.Speed", "description": "Vehicle speed", "datatype": "float", "unit": "", "access": "read"},
@@ -31,6 +45,13 @@ class VssTests(unittest.TestCase):
             "signals[0]: signal must be an object",
             "signals[1]: signal must be an object",
         ])
+
+    def test_unhashable_datatype_is_reported_without_crashing(self):
+        errors = lint({"signals": [
+            {"path": "Vehicle.Body.Mode", "description": "Current body mode", "datatype": [], "access": "read"},
+            {"path": "Vehicle.Body.State", "description": "Current body state", "datatype": {}, "access": "read"},
+        ]})
+        self.assertEqual(sum("unsupported datatype" in e for e in errors), 2)
 
     def test_non_object_model_is_reported_without_crashing(self):
         self.assertEqual(lint([{"path": "Vehicle.Body.IsLocked"}]), ["model must be a JSON object"])
