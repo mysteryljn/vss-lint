@@ -29,19 +29,24 @@ def lint(model):
         # export failure removed every entry.
         return ["signals must not be empty"]
     seen=set()
+    valid_paths=[]
     for i,s in enumerate(signals):
         prefix="signals[%d]"%i
         if not isinstance(s,dict):
             errors.append(prefix+": signal must be an object")
             continue
         path=s.get("path"); name=path.rsplit(".",1)[-1] if isinstance(path,str) and "." in path else ""
-        if not isinstance(path,str) or not PATH.match(path): errors.append(prefix+": invalid logical path")
+        # ``$`` also matches before a final newline.  Require the whole path
+        # so a JSON-escaped newline cannot pass validation as another key.
+        if not isinstance(path,str) or not PATH.fullmatch(path): errors.append(prefix+": invalid logical path")
         # JSON paths can be arrays/objects as well as strings.  Invalid
         # values are already reported above; do not use unhashable values as
         # keys in ``seen`` or malformed input would crash the linter.
         if isinstance(path,str):
             if path in seen: errors.append(prefix+": duplicate path "+str(path))
             seen.add(path)
+            if PATH.fullmatch(path):
+                valid_paths.append((i,path))
         if not isinstance(s.get("description"),str) or len(s["description"].strip())<8: errors.append(prefix+": description is too short")
         # JSON values may use arrays/objects here.  Checking an unhashable
         # value directly against the set would raise TypeError and abort the
@@ -53,6 +58,16 @@ def lint(model):
         if base_datatype not in ("boolean","string") and (not isinstance(unit,str) or not unit.strip()): errors.append(prefix+": numeric signals require unit")
         if s.get("access") not in ("read","write","readWrite"): errors.append(prefix+": access must be read, write, or readWrite")
         if name.startswith("Is") and s.get("datatype")!="boolean": errors.append(prefix+": Is* signals should be boolean")
+    # Every catalog entry is a typed signal leaf.  A leaf cannot also be an
+    # implicit branch for another signal.  Check after collecting all paths
+    # so child-before-parent input is handled too; use whole dotted segments
+    # to keep Vehicle.Power and Vehicle.Powertrain distinct.
+    for i,path in valid_paths:
+        ancestor=path
+        while "." in ancestor:
+            ancestor=ancestor.rsplit(".",1)[0]
+            if ancestor in seen:
+                errors.append("signals[%d]: signal path is also an ancestor: %s of %s"%(i,ancestor,path))
     return errors
 def main(argv=None):
     p=argparse.ArgumentParser(description="Lint a VSS-like signal catalog"); p.add_argument("model",type=Path); a=p.parse_args(argv)
