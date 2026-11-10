@@ -13,3 +13,7 @@ COVESA VSS 通过逻辑路径和统一语义抽象底层总线，但企业扩展
 ## 许可证
 
 MIT
+
+## Archived
+
+This repository is archived and no longer receives feature development. See the maintained replacement [dbc-change-review](https://github.com/mysteryljn/dbc-change-review) for the active workflow. The source history remains available for reference.
